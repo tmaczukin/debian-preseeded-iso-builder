@@ -2,47 +2,60 @@
 
 set -x
 
-if [ -f debian-stable-amd64-preseed.iso ]; then
-    sudo rm debian-stable-amd64-preseed.iso
+START_DIR=$(pwd)
+SOURCE_ISO_URL=http://cdimage.debian.org/debian-cd/8.1.0/amd64/iso-cd/debian-8.1.0-amd64-netinst.iso
+WORK_DIR=/tmp/iso-preseed
+SOURCE_ISO=${WORK_DIR}/debian-stable-amd64.iso
+TARGET_ISO=${WORK_DIR}/debian-stable-amd64-preseed.iso
+SOURCE_DIR=${WORK_DIR}/source
+TARGET_DIR=${WORK_DIR}/target
+INIT_RAMDISK_DIR=${WORK_DIR}/init_ramdisk
+PRESEED=${WORK_DIR}/preseed.txt
+
+if [[ ! -d ${WORK_DIR} ]]; then
+    mkdir -p ${WORK_DIR}
 fi
 
-grep -v "^#" debian-stable-preseed.txt  | grep -v "^$$" > preseed.txt
-
-if [ ! -f debian-stable-amd64.iso ]; then
-    wget http://cdimage.debian.org/debian-cd/7.8.0/amd64/iso-cd/debian-7.8.0-amd64-netinst.iso -O debian-stable-amd64.iso
+if [[ ! -f ${SOURCE_ISO} ]]; then
+    wget "${SOURCE_ISO_URL}" -O ${SOURCE_ISO}
 fi
 
-if [ -d ./tmp ]; then
-    rm -rf ./tmp
+if [[ -f ${TARGET_ISO} ]]; then
+    rm -rf ${TARGET_ISO}
 fi
-mkdir ./tmp
 
-sudo mount -o loop debian-stable-amd64.iso ./tmp
-
-if [ -d ./cd ]; then
-    rm -rf ./cd
+if [[ -d ${SOURCE_DIR} ]]; then
+    sudo rm -rf ${SOURCE_DIR}
 fi
-mkdir ./cd
+mkdir -p ${SOURCE_DIR}
 
-rsync -aH --exclude=TRANS.TBL ./tmp/ ./cd/
+if [[ -d ${TARGET_DIR} ]]; then
+    sudo rm -rf ${TARGET_DIR}
+fi
 
-sudo umount ./tmp
-rmdir ./tmp
+grep -v "^#" debian-stable-preseed.txt  | grep -v "^$" > ${PRESEED}
 
-mkdir ./irmod
-cd ./irmod
+sudo mount -o loop ${SOURCE_ISO} ${SOURCE_DIR}
 
-gzip -d < ../cd/install.amd/initrd.gz | cpio --extract --verbose --make-directories --no-absolute-filenames
-cp ../preseed.txt preseed.cfg
-find . | cpio -H newc --create --verbose | gzip -f -9 | sudo tee ../cd/install.amd/initrd.gz > /dev/null
+rsync -aH --exclude=TRANS.TBL ${SOURCE_DIR}/* ${TARGET_DIR}
+rsync -aH --exclude=TRANS.TBL ${SOURCE_DIR}/.disk ${TARGET_DIR}
 
-cd ../
-rm -rf ./irmod/
+sudo umount ${SOURCE_DIR}
+rmdir ${SOURCE_DIR}
 
-cd ./cd
-md5sum `find -follow -type f` | sudo tee md5sum.txt > /dev/null
-cd ../
+mkdir -p ${INIT_RAMDISK_DIR}
+cd ${INIT_RAMDISK_DIR}
 
-sudo genisoimage -o debian-stable-amd64-preseed.iso -r -J -no-emul-boot -boot-load-size 4 -boot-info-table -b isolinux/isolinux.bin -c isolinux/boot.cat ./cd
-sudo rm -rf ./cd
+gzip -d < ${TARGET_DIR}/install.amd/initrd.gz | cpio --extract --verbose --make-directories --no-absolute-filenames
+cp ${PRESEED} preseed.cfg
+find . | cpio -H newc --create --verbose | gzip -f -9 | sudo tee ${TARGET_DIR}/install.amd/initrd.gz >/dev/null 2>&1
 
+cd ${START_DIR}
+sudo rm -rf ${INIT_RAMDISK_DIR}
+
+cd ${TARGET_DIR}
+md5sum `find -follow -type f` | sudo tee md5sum.txt >/dev/null 2>&1
+cd ${START_DIR}
+
+sudo genisoimage -o ${TARGET_ISO} -r -J -no-emul-boot -boot-load-size 4 -boot-info-table -b isolinux/isolinux.bin -c isolinux/boot.cat ${TARGET_DIR}
+sudo rm -rf ${TARGET_DIR}
