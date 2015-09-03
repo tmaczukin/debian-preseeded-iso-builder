@@ -207,22 +207,22 @@ d-i partman-lvm/confirm_nooverwrite boolean true
 #
 
 d-i partman-auto/expert_recipe string \
-        boot-root-swap ::             \
-            2432 1024 -1 ext4         \
-                $defaultignore{ }     \
-                $primary{ }           \
-                method{ lvm }         \
-                vg_name{ vol1 }       \
-                .                     \
+        boot ::                       \
             256 512 512 ext4          \
-                $lvmok{ }             \
-                $in_vg{ vol1 }        \
-                lv_name{ boot }       \
+                $primary{ }           \
+                $bootable{ }          \
                 method{ format }      \
                 format{ }             \
                 use_filesystem{ }     \
                 filesystem{ ext4 }    \
                 mountpoint{ /boot }   \
+                .                     \
+        root-swap ::                  \
+            2432 1024 -1 ext4         \
+                $defaultignore{ }     \
+                $primary{ }           \
+                method{ lvm }         \
+                vg_name{ vol1 }       \
                 .                     \
             2048 512 -1 ext4          \
                 $lvmok{ }             \
@@ -238,10 +238,9 @@ d-i partman-auto/expert_recipe string \
                 $lvmok{ }             \
                 in_vg{ vol1 }         \
                 lv_name{ swap }       \
-                method{ format }      \
+                method{ swap }        \
                 format{ }             \
                 .
-
 
 # The full recipe format is documented in the file partman-auto-recipe.txt
 # included in the 'debian-installer' package or available from D-I source
@@ -388,7 +387,7 @@ d-i grub-installer/with_other_os boolean true
 # determined safely in general, so this needs to be specified:
 #d-i grub-installer/bootdev  string /dev/sda
 # To install to the first device (assuming it is not a USB stick):
-#d-i grub-installer/bootdev  string default
+d-i grub-installer/bootdev  string default
 
 # Alternatively, if you want to install to a location other than the mbr,
 # uncomment and edit these lines:
